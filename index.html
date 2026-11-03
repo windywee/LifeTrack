@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Life Track · Simple Expiration Reminder</title>
+
+  <link rel="icon" type="image/png" href="lifetrack_logo.png">
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif; }
+
+    :root {
+      --base-font: 15px;
+      --title-font: 26px;
+      --h2-font: 20px;
+      --small-font: 13px;
+      --item-name-font: 17px;
+      --item-expiry-font: 14px;
+      --btn-font: 15px;
+      --tag-font: 11px;
+      --action-font: 13px;
+      --input-font: 15px;
+    }
+
+    /* Elderly mode — everything scales up */
+    body.elderly {
+      --base-font: 19px;
+      --title-font: 32px;
+      --h2-font: 26px;
+      --small-font: 16px;
+      --item-name-font: 22px;
+      --item-expiry-font: 18px;
+      --btn-font: 19px;
+      --tag-font: 14px;
+      --action-font: 16px;
+      --input-font: 19px;
+    }
+
+    body {
+      background: #f9fafc;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+      font-size: var(--base-font);
+    }
+
+    .app {
+      max-width: 1000px;
+      width: 100%;
+      background: #ffffff;
+      border-radius: 32px;
+      box-shadow: 0 18px 35px -12px rgba(0, 0, 0, 0.08), 0 8px 18px -8px rgba(0, 0, 0, 0.04);
+      padding: 32px 28px;
+      position: relative;
+    }
+
+    /* ===== Top-right controls ===== */
+    .top-controls {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      z-index: 10;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .control-group {
+      display: flex;
+      gap: 4px;
+      background: #f1f5f9;
+      padding: 4px;
+      border-radius: 40px;
+    }
+
+    .control-btn {
+      background: transparent;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 30px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #475569;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .control-btn:hover { background: #e2e8f0; }
+    .control-btn.active { background: #4f46e5; color: white; }
+
+    .elderly-toggle {
+      background: #fef3c7;
+      border: 1px solid #fcd34d;
+      color: #92400e;
+      padding: 6px 14px;
+      border-radius: 30px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .elderly-toggle:hover { background: #fde68a; }
+    .elderly-toggle.active { background: #f59e0b; color: white; border-color: #d97706; }
+
+    .header { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; padding-right: 180px; }
+    .logo { width: 48px; height: 48px; flex-shrink: 0; object-fit: contain; display: block; }
+
+    h1 {
+      font-size: var(--title-font); font-weight: 500; letter-spacing: -0.02em; color: #1e293b;
+      display: flex; align-items: center; gap: 10px; margin-bottom: 0;
+    }
+    h1 span {
+      background: #eef2ff; color: #4f46e5; font-size: calc(var(--small-font) + 1px);
+      font-weight: 500; padding: 4px 10px; border-radius: 40px; letter-spacing: 0.3px;
+    }
+
+    .subhead {
+      color: #64748b; font-size: var(--base-font); margin-bottom: 28px;
+      border-left: 3px solid #cbd5e1; padding-left: 14px; margin-left: 62px;
+    }
+
+    .category-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 32px; }
+    .category-btn {
+      background: #f1f5f9; border: none; padding: 10px 18px; border-radius: 40px;
+      font-size: calc(var(--small-font) + 1px); font-weight: 500; color: #334155; cursor: pointer;
+      transition: all 0.2s ease; display: flex; align-items: center; gap: 6px; flex: 0 1 auto;
+    }
+    .category-btn:hover { background: #e2e8f0; }
+    .category-btn.active { background: #4f46e5; color: white; box-shadow: 0 6px 12px -6px rgba(79, 70, 229, 0.4); }
+
+    .form-card {
+      background: #ffffff; border: 1px solid #e9eef3; border-radius: 24px;
+      padding: 24px 22px; margin-bottom: 36px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+    }
+    .form-title {
+      font-size: calc(var(--h2-font) - 2px); font-weight: 500; color: #1e293b;
+      margin-bottom: 20px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+
+    .input-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+    .input-group { flex: 1 1 200px; display: flex; flex-direction: column; gap: 6px; }
+    .input-group label {
+      font-size: var(--small-font); font-weight: 500; color: #475569;
+      letter-spacing: 0.3px; text-transform: uppercase;
+    }
+    .input-group input {
+      padding: 12px 16px; border: 1.5px solid #e2e8f0; border-radius: 16px;
+      font-size: var(--input-font); background: #fdfdfe; transition: border-color 0.2s, box-shadow 0.2s; outline: none;
+    }
+    .input-group input:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+
+    .input-with-scan { display: flex; gap: 8px; align-items: center; }
+    .input-with-scan input { flex: 1; min-width: 0; }
+
+    .scan-btn {
+      background: #eef2ff; border: 1.5px solid #c7d2fe; color: #4f46e5;
+      width: 46px; height: 46px; border-radius: 16px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; font-size: 18px;
+      flex-shrink: 0; transition: all 0.2s ease;
+    }
+    .scan-btn:hover { background: #e0e7ff; border-color: #a5b4fc; transform: translateY(-1px); }
+    .scan-btn:active { transform: translateY(1px); }
+
+    .save-btn {
+      background: #4f46e5; border: none; color: white; padding: 12px 28px; border-radius: 40px;
+      font-weight: 500; font-size: var(--btn-font); cursor: pointer; transition: all 0.2s ease;
+      display: flex; align-items: center; gap: 8px; justify-content: center;
+      white-space: nowrap; box-shadow: 0 8px 16px -8px rgba(79, 70, 229, 0.35);
+      margin-top: 8px; height: 46px;
+    }
+    .save-btn:hover { background: #4338ca; transform: translateY(-1px); box-shadow: 0 12px 20px -8px rgba(79, 70, 229, 0.4); }
+    .save-btn:active { transform: translateY(1px); box-shadow: 0 4px 10px -4px rgba(79, 70, 229, 0.4); }
+
+    .scanner-overlay {
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(4px); display: none; align-items: center;
+      justify-content: center; z-index: 999; padding: 16px;
+    }
+    .scanner-overlay.active { display: flex; }
+    .scanner-modal {
+      background: #ffffff; border-radius: 24px; padding: 24px; max-width: 480px; width: 100%;
+      box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.25); display: flex; flex-direction: column; gap: 16px;
+    }
+    .scanner-header { display: flex; justify-content: space-between; align-items: center; }
+    .scanner-header h3 { font-size: var(--h2-font); font-weight: 500; color: #1e293b; }
+    .close-scanner {
+      background: #f1f5f9; border: none; width: 36px; height: 36px; border-radius: 50%;
+      cursor: pointer; font-size: 18px; color: #475569; display: flex; align-items: center;
+      justify-content: center; transition: background 0.2s;
+    }
+    .close-scanner:hover { background: #e2e8f0; }
+    #qrReader { width: 100%; border-radius: 16px; overflow: hidden; background: #0f172a; min-height: 240px; }
+    #qrReader video { border-radius: 16px; }
+    #qrReader img { display: none; }
+    .scanner-status {
+      font-size: var(--item-expiry-font); color: #64748b;
+      text-align: center; min-height: 20px; line-height: 1.4;
+    }
+    .scanner-status.error { color: #dc2626; }
+    .scanner-status.success { color: #16a34a; }
+
+    .list-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 18px; flex-wrap: wrap; gap: 8px; }
+    .list-header h2 { font-size: var(--h2-font); font-weight: 500; color: #1e293b; }
+    .item-count {
+      background: #f1f5f9; color: #475569; padding: 4px 12px; border-radius: 40px;
+      font-size: var(--small-font); font-weight: 500;
+    }
+
+    .items-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+
+    .item-card {
+      background: #ffffff; border: 1px solid #eef2f6; border-radius: 20px;
+      padding: 16px; transition: all 0.15s ease; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+      display: flex; flex-direction: column; gap: 10px; position: relative;
+    }
+    .item-card:hover { border-color: #cbd5e1; box-shadow: 0 12px 22px -12px rgba(0, 0, 0, 0.08); }
+
+    .item-category-tag {
+      font-size: var(--tag-font); font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase;
+      color: #4f46e5; background: #eef2ff; padding: 4px 10px; border-radius: 40px; align-self: flex-start;
+    }
+    .item-name {
+      font-size: var(--item-name-font); font-weight: 500; color: #0f172a;
+      line-height: 1.3; word-break: break-word; margin-top: 2px;
+    }
+    .item-expiry {
+      display: flex; align-items: center; gap: 6px; font-size: var(--item-expiry-font); color: #475569;
+      background: #f8fafc; padding: 8px 12px; border-radius: 12px; margin-top: 4px; flex-wrap: wrap;
+    }
+    .expiry-date { font-weight: 500; color: #1e293b; }
+
+    .item-actions { display: flex; gap: 8px; margin-top: 6px; }
+    .action-btn {
+      flex: 1; border: none; padding: 8px 10px; border-radius: 12px; font-size: var(--action-font);
+      font-weight: 500; cursor: pointer; display: flex; align-items: center;
+      justify-content: center; gap: 4px; transition: all 0.15s ease;
+    }
+    .used-btn { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+    .used-btn:hover { background: #d1fae5; border-color: #6ee7b7; }
+    .delete-btn { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+    .delete-btn:hover { background: #fee2e2; border-color: #fca5a5; }
+
+    /* Status colors */
+    .item-card.expired { background: #0f172a; border-color: #0f172a; color: #f8fafc; }
+    .item-card.expired .item-name { color: #f8fafc; }
+    .item-card.expired .item-category-tag { background: rgba(255,255,255,0.12); color: #f8fafc; }
+    .item-card.expired .item-expiry { background: rgba(255,255,255,0.1); color: #e2e8f0; }
+    .item-card.expired .expiry-date { color: #ffffff; }
+    .item-card.expired .used-btn { background: rgba(255,255,255,0.12); color: #ffffff; border-color: rgba(255,255,255,0.25); }
+    .item-card.expired .used-btn:hover { background: rgba(255,255,255,0.22); }
+    .item-card.expired .delete-btn { background: rgba(255,255,255,0.12); color: #fecaca; border-color: rgba(255,255,255,0.25); }
+    .item-card.expired .delete-btn:hover { background: rgba(255,255,255,0.22); }
+
+    .item-card.soon { background: #ef4444; border-color: #dc2626; color: #ffffff; }
+    .item-card.soon .item-name { color: #ffffff; }
+    .item-card.soon .item-category-tag { background: rgba(255,255,255,0.2); color: #ffffff; }
+    .item-card.soon .item-expiry { background: rgba(255,255,255,0.18); color: #ffffff; }
+    .item-card.soon .expiry-date { color: #ffffff; }
+    .item-card.soon .used-btn { background: rgba(255,255,255,0.2); color: #ffffff; border-color: rgba(255,255,255,0.3); }
+    .item-card.soon .used-btn:hover { background: rgba(255,255,255,0.3); }
+    .item-card.soon .delete-btn { background: rgba(255,255,255,0.2); color: #ffffff; border-color: rgba(255,255,255,0.3); }
+    .item-card.soon .delete-btn:hover { background: rgba(255,255,255,0.3); }
+
+    .item-card.warning { background: #facc15; border-color: #eab308; color: #1e293b; }
+    .item-card.warning .item-name { color: #1e293b; }
+    .item-card.warning .item-category-tag { background: rgba(255,255,255,0.5); color: #854d0e; }
+    .item-card.warning .item-expiry { background: rgba(255,255,255,0.5); color: #422006; }
+    .item-card.warning .expiry-date { color: #1e293b; }
+    .item-card.warning .used-btn { background: rgba(255,255,255,0.5); color: #14532d; border-color: rgba(0,0,0,0.1); }
+    .item-card.warning .used-btn:hover { background: rgba(255,255,255,0.7); }
+    .item-card.warning .delete-btn { background: rgba(255,255,255,0.5); color: #7f1d1d; border-color: rgba(0,0,0,0.1); }
+    .item-card.warning .delete-btn:hover { background: rgba(255,255,255,0.7); }
+
+    .empty-state {
+      background: #f8fafc; border-radius: 24px; padding: 40px 20px; text-align: center;
+      color: #94a3b8; font-size: var(--base-font); border: 1px dashed #d1d9e6; grid-column: 1 / -1;
+    }
+    .icon-emoji { font-size: 18px; line-height: 1; }
+
+    /* Responsive */
+    @media (max-width: 700px) {
+      .header { padding-right: 0; padding-top: 40px; }
+      .top-controls { top: 12px; right: 12px; }
+    }
+    @media (max-width: 600px) {
+      .app { padding: 20px 16px; }
+      .header { gap: 10px; }
+      .logo { width: 38px; height: 38px; }
+      .subhead { margin-left: 48px; }
+      .category-btn { font-size: var(--small-font); padding: 8px 14px; }
+      .input-row { flex-direction: column; align-items: stretch; }
+      .save-btn { width: 100%; margin-top: 4px; }
+      .items-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+      .item-card { padding: 14px; }
+    }
+    @media (max-width: 380px) { .items-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="app">
+
+    <!-- ===== TOP CONTROLS ===== -->
+    <div class="top-controls">
+      <button class="elderly-toggle" id="elderlyToggle" title="Elderly mode">👁️ <span id="elderlyLabel">Elderly Mode</span></button>
+      <div class="control-group" id="langGroup">
+        <button class="control-btn active" data-lang="en">EN</button>
+        <button class="control-btn" data-lang="zh">繁</button>
+        <button class="control-btn" data-lang="ms">MS</button>
+      </div>
+    </div>
+
+    <div class="header">
+      <img class="logo" src="lifetrack_logo.png" alt="Life Track logo">
+      <h1><span data-i18n="appTitle">Life Track</span> <span data-i18n="tagline">Stay ahead</span></h1>
+    </div>
+
+    <div class="subhead" data-i18n="subhead">Never miss an expiration date — Your all in one expiration manager</div>
+
+    <div class="category-grid" id="categoryContainer">
+      <button class="category-btn active" data-category="meds">💊 <span data-i18n="catMeds">Medicine & Supplements</span></button>
+      <button class="category-btn" data-category="cosmetics">🧴 <span data-i18n="catCosmetics">Cosmetics & Skincare</span></button>
+      <button class="category-btn" data-category="food">🍎 <span data-i18n="catFood">Food</span></button>
+      <button class="category-btn" data-category="pet">🐾 <span data-i18n="catPet">Kids / Pets Food</span></button>
+      <button class="category-btn" data-category="household">🧻 <span data-i18n="catHousehold">Household</span></button>
+    </div>
+
+    <div class="form-card">
+      <div class="form-title"><span>📝 <span data-i18n="addTo">Add to</span></span><span id="currentCategoryLabel">Medicine & Supplements</span></div>
+      <div class="input-row">
+        <div class="input-group">
+          <label for="itemName" data-i18n="itemNameLabel">Item name</label>
+          <div class="input-with-scan">
+            <input type="text" id="itemName" placeholder="e.g. Vitamin C" data-i18n-placeholder="itemNamePlaceholder" autocomplete="off">
+            <button class="scan-btn" id="scanBtn" title="Scan barcode" aria-label="Scan barcode">📷</button>
+          </div>
+        </div>
+        <div class="input-group">
+          <label for="expiryDate" data-i18n="expiryDateLabel">Expiry date</label>
+          <input type="date" id="expiryDate">
+        </div>
+        <button class="save-btn" id="saveBtn"><span>+</span> <span data-i18n="saveItem">Save item</span></button>
+      </div>
+    </div>
+
+    <div class="list-header">
+      <h2 id="listTitle">Medicine & Supplements</h2>
+      <span class="item-count" id="itemCount">0 items</span>
+    </div>
+
+    <div class="items-grid" id="itemsGrid"></div>
+  </div>
+
+  <div class="scanner-overlay" id="scannerOverlay">
+    <div class="scanner-modal">
+      <div class="scanner-header">
+        <h3>📷 <span data-i18n="scanTitle">Scan Barcode</span></h3>
+        <button class="close-scanner" id="closeScanner" aria-label="Close scanner">✕</button>
+      </div>
+      <div id="qrReader"></div>
+      <div class="scanner-status" id="scannerStatus" data-i18n="scanHint">Point your camera at a barcode...</div>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      /* ===================== i18n ===================== */
+      const TRANSLATIONS = {
+        en: {
+          appTitle: 'Life Track',
+          tagline: 'Stay ahead',
+          subhead: 'Never miss an expiration date — Your all in one expiration manager',
+          catMeds: 'Medicine & Supplements',
+          catCosmetics: 'Cosmetics & Skincare',
+          catFood: 'Food',
+          catPet: 'Kids / Pets Food',
+          catHousehold: 'Household',
+          addTo: 'Add to',
+          itemNameLabel: 'Item name',
+          itemNamePlaceholder: 'e.g. Vitamin C',
+          expiryDateLabel: 'Expiry date',
+          saveItem: 'Save item',
+          elderlyMode: 'Elderly Mode',
+          itemCountOne: 'item',
+          itemCountMany: 'items',
+          expires: 'Expires:',
+          notSet: 'Not set',
+          usedUp: 'Used up',
+          delete: 'Delete',
+          emptyTitle: 'No items saved in this category yet.',
+          emptyHint: 'Add your first item above ✨',
+          scanTitle: 'Scan Barcode',
+          scanHint: 'Point your camera at a barcode...',
+          startingCamera: 'Starting camera...',
+          lookingUp: 'Looking up',
+          found: 'Found:',
+          barcodeNotFound: 'not found in the database. Please type the name manually.',
+          barcodeNoName: 'found, but no product name. Please type it manually.',
+          noDbForCategory: 'No database for this category — please type the name manually.',
+          lookupFailed: 'Lookup failed (network or API error). Please type the name manually.',
+          cameraUnavailable: 'Camera unavailable. Please allow camera access or check your device.',
+          cameraNotSupported: 'Camera not available. Please use HTTPS or a supported browser.',
+          alertName: 'Please enter an item name.',
+          alertExpiry: 'Please select an expiry date.',
+          confirmDelete: 'Delete this item?',
+          confirmUsed: 'Mark as used up and remove from list?'
+        },
+        zh: {
+          appTitle: '生活追蹤',
+          tagline: '提前掌握',
+          subhead: '不再錯過任何有效期限 — 您的一站式到期管理工具',
+          catMeds: '藥物與保健品',
+          catCosmetics: '化妝品與護膚品',
+          catFood: '食品',
+          catPet: '兒童/寵物食品',
+          catHousehold: '家庭用品',
+          addTo: '新增至',
+          itemNameLabel: '物品名稱',
+          itemNamePlaceholder: '例如：維他命C',
+          expiryDateLabel: '有效期限',
+          saveItem: '儲存物品',
+          elderlyMode: '長者模式',
+          itemCountOne: '項',
+          itemCountMany: '項',
+          expires: '到期日：',
+          notSet: '未設定',
+          usedUp: '已用完',
+          delete: '刪除',
+          emptyTitle: '此分類尚無儲存的物品。',
+          emptyHint: '在上方新增您的第一件物品 ✨',
+          scanTitle: '掃描條碼',
+          scanHint: '將鏡頭對準條碼...',
+          startingCamera: '正在啟動鏡頭...',
+          lookingUp: '查詢中',
+          found: '找到：',
+          barcodeNotFound: '在資料庫中找不到。請手動輸入名稱。',
+          barcodeNoName: '已找到，但無產品名稱。請手動輸入。',
+          noDbForCategory: '此分類無資料庫 — 請手動輸入名稱。',
+          lookupFailed: '查詢失敗（網路或 API 錯誤）。請手動輸入名稱。',
+          cameraUnavailable: '鏡頭無法使用。請允許鏡頭存取權限或檢查您的裝置。',
+          cameraNotSupported: '鏡頭無法使用。請使用 HTTPS 或支援的瀏覽器。',
+          alertName: '請輸入物品名稱。',
+          alertExpiry: '請選擇有效期限。',
+          confirmDelete: '確定要刪除此物品嗎？',
+          confirmUsed: '標記為已用完並從列表中移除？'
+        },
+        ms: {
+          appTitle: 'Jejak Hayat',
+          tagline: 'Sentiasa Dahulu',
+          subhead: 'Jangan terlepas tarikh luput — Pengurus tamat tempoh anda semua dalam satu',
+          catMeds: 'Ubat & Suplemen',
+          catCosmetics: 'Kosmetik & Penjagaan Kulit',
+          catFood: 'Makanan',
+          catPet: 'Makanan Kanak-kanak / Haiwan',
+          catHousehold: 'Barang Rumah',
+          addTo: 'Tambah ke',
+          itemNameLabel: 'Nama barang',
+          itemNamePlaceholder: 'cth. Vitamin C',
+          expiryDateLabel: 'Tarikh luput',
+          saveItem: 'Simpan barang',
+          elderlyMode: 'Mod Warga Emas',
+          itemCountOne: 'item',
+          itemCountMany: 'item',
+          expires: 'Luput:',
+          notSet: 'Belum ditetapkan',
+          usedUp: 'Telah habis',
+          delete: 'Padam',
+          emptyTitle: 'Tiada barang disimpan dalam kategori ini lagi.',
+          emptyHint: 'Tambah barang pertama anda di atas ✨',
+          scanTitle: 'Imbas Kod Bar',
+          scanHint: 'Halakan kamera ke kod bar...',
+          startingCamera: 'Memulakan kamera...',
+          lookingUp: 'Mencari',
+          found: 'Dijumpai:',
+          barcodeNotFound: 'tidak dijumpai dalam pangkalan data. Sila taip nama secara manual.',
+          barcodeNoName: 'dijumpai, tetapi tiada nama produk. Sila taip secara manual.',
+          noDbForCategory: 'Tiada pangkalan data untuk kategori ini — sila taip nama secara manual.',
+          lookupFailed: 'Carian gagal (ralat rangkaian atau API). Sila taip nama secara manual.',
+          cameraUnavailable: 'Kamera tidak tersedia. Sila benarkan akses kamera atau semak peranti anda.',
+          cameraNotSupported: 'Kamera tidak tersedia. Sila gunakan HTTPS atau pelayar yang disokong.',
+          alertName: 'Sila masukkan nama barang.',
+          alertExpiry: 'Sila pilih tarikh luput.',
+          confirmDelete: 'Padam barang ini?',
+          confirmUsed: 'Tandakan sebagai habis dan buang dari senarai?'
+        }
+      };
+
+      // Category label keys for i18n
+      const CATEGORY_KEYS = {
+        meds: 'catMeds',
+        cosmetics: 'catCosmetics',
+        food: 'catFood',
+        pet: 'catPet',
+        household: 'catHousehold'
+      };
+
+      const API_ENDPOINTS = {
+        meds: null,
+        cosmetics: 'https://world.openbeautyfacts.org/api/v2/product/',
+        food: 'https://world.openfoodfacts.org/api/v2/product/',
+        pet: 'https://world.openpetfoodfacts.org/api/v2/product/',
+        household: 'https://world.openproductsfacts.org/api/v2/product/'
+      };
+
+      /* ===================== State ===================== */
+      let items = loadItems();
+      let activeCategory = 'meds';
+      let currentLang = localStorage.getItem('lifetrack_lang') || 'en';
+      let isElderly = localStorage.getItem('lifetrack_elderly') === 'true';
+
+      /* ===================== DOM ===================== */
+      const categoryContainer = document.getElementById('categoryContainer');
+      const categoryButtons = categoryContainer.querySelectorAll('.category-btn');
+      const currentCategoryLabel = document.getElementById('currentCategoryLabel');
+      const listTitle = document.getElementById('listTitle');
+      const itemCountSpan = document.getElementById('itemCount');
+      const itemsGrid = document.getElementById('itemsGrid');
+      const itemNameInput = document.getElementById('itemName');
+      const expiryDateInput = document.getElementById('expiryDate');
+      const saveBtn = document.getElementById('saveBtn');
+      const scanBtn = document.getElementById('scanBtn');
+      const scannerOverlay = document.getElementById('scannerOverlay');
+      const closeScannerBtn = document.getElementById('closeScanner');
+      const scannerStatus = document.getElementById('scannerStatus');
+      const elderlyToggle = document.getElementById('elderlyToggle');
+      const elderlyLabel = document.getElementById('elderlyLabel');
+      const langGroup = document.getElementById('langGroup');
+      const langButtons = langGroup.querySelectorAll('.control-btn');
+
+      let qrScanner = null;
+
+      /* ===================== i18n helpers ===================== */
+      function t(key) {
+        return (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang][key]) || TRANSLATIONS.en[key] || key;
+      }
+
+      function applyLanguage(lang) {
+        currentLang = lang;
+        localStorage.setItem('lifetrack_lang', lang);
+        document.documentElement.lang = lang === 'zh' ? 'zh-Hant' : (lang === 'ms' ? 'ms' : 'en');
+
+        // Update all data-i18n nodes
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+          const key = el.getAttribute('data-i18n');
+          el.textContent = t(key);
+        });
+        // Update placeholders
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+          const key = el.getAttribute('data-i18n-placeholder');
+          el.setAttribute('placeholder', t(key));
+        });
+
+        // Elderly toggle label
+        elderlyLabel.textContent = t('elderlyMode');
+
+        // Update lang button active state
+        langButtons.forEach(btn => {
+          if (btn.dataset.lang === lang) btn.classList.add('active');
+          else btn.classList.remove('active');
+        });
+
+        // Re-render to update dynamic card text
+        renderItems();
+      }
+
+      /* ===================== Elderly mode ===================== */
+      function applyElderlyMode(on) {
+        isElderly = on;
+        localStorage.setItem('lifetrack_elderly', on ? 'true' : 'false');
+        if (on) {
+          document.body.classList.add('elderly');
+          elderlyToggle.classList.add('active');
+        } else {
+          document.body.classList.remove('elderly');
+          elderlyToggle.classList.remove('active');
+        }
+      }
+
+      /* ===================== Storage ===================== */
+      function saveItems() {
+        localStorage.setItem('expiryTracker_items', JSON.stringify(items));
+      }
+
+      function buildSampleItems() {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        function addDays(days) {
+          const d = new Date(today);
+          d.setDate(d.getDate() + days);
+          return d.toISOString().slice(0, 10);
+        }
+
+        return [
+          { id: 's1', category: 'meds', name: 'Expired vitamins', expiry: addDays(-5) },
+          { id: 's2', category: 'meds', name: 'Painkiller (expires today)', expiry: addDays(0) },
+          { id: 's3', category: 'food', name: 'Yogurt (2 days left)', expiry: addDays(2) },
+          { id: 's4', category: 'cosmetics', name: 'Cream (7 days left)', expiry: addDays(7) },
+          { id: 's5', category: 'pet', name: 'Cat treats (14 days)', expiry: addDays(14) },
+          { id: 's6', category: 'household', name: 'Dish soap (30 days)', expiry: addDays(30) },
+        ];
+      }
+
+      function loadItems() {
+        const stored = localStorage.getItem('expiryTracker_items');
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed) && parsed.length) return parsed;
+          } catch (e) {}
+        }
+        return buildSampleItems();
+      }
+
+      function generateId() {
+        return Date.now() + '-' + Math.random().toString(36).substring(2, 8);
+      }
+
+      function getStatusClass(expiryStr) {
+        if (!expiryStr) return '';
+        const parts = expiryStr.split('-').map(Number);
+        if (parts.length !== 3) return '';
+        const expiry = new Date(parts[0], parts[1] - 1, parts[2]);
+        expiry.setHours(0, 0, 0, 0);
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const diffDays = Math.round((expiry - today) / (1000 * 60 * 60 * 24));
+
+        if (diffDays < 0) return 'expired';
+        if (diffDays <= 3) return 'soon';
+        if (diffDays <= 15) return 'warning';
+        return '';
+      }
+
+      /* ===================== Render ===================== */
+      function renderItems() {
+        const catKey = CATEGORY_KEYS[activeCategory];
+        const currentLabel = t(catKey);
+        currentCategoryLabel.textContent = currentLabel;
+        listTitle.textContent = currentLabel;
+
+        const filtered = items.filter(item => item.category === activeCategory);
+        const countWord = filtered.length === 1 ? t('itemCountOne') : t('itemCountMany');
+        itemCountSpan.textContent = filtered.length + ' ' + countWord;
+        itemsGrid.innerHTML = '';
+
+        if (filtered.length === 0) {
+          const emptyDiv = document.createElement('div');
+          emptyDiv.className = 'empty-state';
+          emptyDiv.innerHTML = `
+            <div style="font-size: 32px; margin-bottom: 8px;">📭</div>
+            <div>${t('emptyTitle')}</div>
+            <div style="font-size: 13px; margin-top: 6px; color: #b0bedb;">${t('emptyHint')}</div>
+          `;
+          itemsGrid.appendChild(emptyDiv);
+          return;
+        }
+
+        filtered.sort((a, b) => {
+          if (!a.expiry) return 1;
+          if (!b.expiry) return -1;
+          return a.expiry.localeCompare(b.expiry);
+        });
+
+        filtered.forEach(item => {
+          const card = document.createElement('div');
+          card.className = 'item-card';
+          const status = getStatusClass(item.expiry);
+          if (status) card.classList.add(status);
+
+          const categoryTag = document.createElement('div');
+          categoryTag.className = 'item-category-tag';
+          categoryTag.textContent = t(CATEGORY_KEYS[item.category] || 'catMeds');
+
+          const nameEl = document.createElement('div');
+          nameEl.className = 'item-name';
+          nameEl.textContent = item.name;
+
+          const expiryDiv = document.createElement('div');
+          expiryDiv.className = 'item-expiry';
+          const expiryDisplay = item.expiry || t('notSet');
+          expiryDiv.innerHTML = `
+            <span class="icon-emoji">📅</span>
+            <span>${t('expires')}</span>
+            <span class="expiry-date">${expiryDisplay}</span>
+          `;
+
+          const actionsDiv = document.createElement('div');
+          actionsDiv.className = 'item-actions';
+
+          const usedBtn = document.createElement('button');
+          usedBtn.className = 'action-btn used-btn';
+          usedBtn.innerHTML = '✅ ' + t('usedUp');
+          usedBtn.addEventListener('click', () => markUsedUp(item.id));
+
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className = 'action-btn delete-btn';
+          deleteBtn.innerHTML = '🗑️ ' + t('delete');
+          deleteBtn.addEventListener('click', () => deleteItem(item.id));
+
+          actionsDiv.appendChild(usedBtn);
+          actionsDiv.appendChild(deleteBtn);
+          card.appendChild(categoryTag);
+          card.appendChild(nameEl);
+          card.appendChild(expiryDiv);
+          card.appendChild(actionsDiv);
+          itemsGrid.appendChild(card);
+        });
+      }
+
+      function updateActiveButton() {
+        categoryButtons.forEach(btn => {
+          if (btn.dataset.category === activeCategory) btn.classList.add('active');
+          else btn.classList.remove('active');
+        });
+      }
+
+      function switchCategory(newCategory) {
+        if (newCategory === activeCategory) return;
+        activeCategory = newCategory;
+        updateActiveButton();
+        renderItems();
+        itemNameInput.value = '';
+        expiryDateInput.value = '';
+        itemNameInput.focus();
+      }
+
+      /* ===================== CRUD ===================== */
+      function addNewItem() {
+        const name = itemNameInput.value.trim();
+        const expiry = expiryDateInput.value;
+        if (!name) { alert(t('alertName')); itemNameInput.focus(); return; }
+        if (!expiry) { alert(t('alertExpiry')); expiryDateInput.focus(); return; }
+
+        items.push({ id: generateId(), category: activeCategory, name, expiry });
+        saveItems();
+        renderItems();
+        itemNameInput.value = '';
+        expiryDateInput.value = '';
+        itemNameInput.focus();
+      }
+
+      function deleteItem(id) {
+        if (!confirm(t('confirmDelete'))) return;
+        items = items.filter(item => item.id !== id);
+        saveItems();
+        renderItems();
+      }
+
+      function markUsedUp(id) {
+        if (!confirm(t('confirmUsed'))) return;
+        items = items.filter(item => item.id !== id);
+        saveItems();
+        renderItems();
+      }
+
+      /* ===================== Scanner ===================== */
+      function setScannerStatus(text, type) {
+        scannerStatus.textContent = text;
+        scannerStatus.className = 'scanner-status' + (type ? ' ' + type : '');
+      }
+
+      async function openScanner() {
+        scannerOverlay.classList.add('active');
+        setScannerStatus(t('startingCamera'));
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          setScannerStatus(t('cameraNotSupported'), 'error');
+          return;
+        }
+        await new Promise(r => setTimeout(r, 100));
+        try {
+          qrScanner = new Html5Qrcode('qrReader');
+          await qrScanner.start(
+            { facingMode: 'environment' },
+            {
+              fps: 10, qrbox: { width: 250, height: 150 },
+              formatsToSupport: [
+                Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
+                Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E,
+                Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39,
+                Html5QrcodeSupportedFormats.ITF
+              ]
+            },
+            onScanSuccess, () => {}
+          );
+          setScannerStatus(t('scanHint'));
+        } catch (err) {
+          console.error('Scanner start error:', err);
+          setScannerStatus(t('cameraUnavailable'), 'error');
+        }
+      }
+
+      async function closeScanner() {
+        scannerOverlay.classList.remove('active');
+        setScannerStatus(t('scanHint'));
+        if (qrScanner) {
+          try { await qrScanner.stop(); await qrScanner.clear(); } catch (e) {}
+          qrScanner = null;
+        }
+      }
+
+      async function onScanSuccess(decodedText) {
+        if (qrScanner) { try { await qrScanner.pause(true); } catch (e) {} }
+        setScannerStatus(`🔍 ${t('lookingUp')} ${decodedText}...`);
+        const endpoint = API_ENDPOINTS[activeCategory];
+
+        if (!endpoint) {
+          setScannerStatus(`Barcode: ${decodedText}. ${t('noDbForCategory')}`, 'error');
+          itemNameInput.value = decodedText;
+          setTimeout(() => { closeScanner(); itemNameInput.focus(); }, 1800);
+          return;
+        }
+
+        try {
+          const url = `${endpoint}${encodeURIComponent(decodedText)}.json`;
+          const res = await fetch(url);
+          const data = await res.json();
+
+          if (data.status === 1 && data.product) {
+            const productName = data.product.product_name || data.product.product_name_en || data.product.generic_name || '';
+            if (productName.trim()) {
+              setScannerStatus(`✅ ${t('found')} ${productName}`, 'success');
+              itemNameInput.value = productName.trim();
+              setTimeout(() => { closeScanner(); expiryDateInput.focus(); }, 900);
+            } else {
+              setScannerStatus(`Barcode ${decodedText} ${t('barcodeNoName')}`, 'error');
+              itemNameInput.value = decodedText;
+              setTimeout(() => { closeScanner(); itemNameInput.focus(); }, 1800);
+            }
+          } else {
+            setScannerStatus(`Barcode ${decodedText} ${t('barcodeNotFound')}`, 'error');
+            itemNameInput.value = decodedText;
+            setTimeout(() => { closeScanner(); itemNameInput.focus(); }, 1800);
+          }
+        } catch (err) {
+          console.error('Lookup error:', err);
+          setScannerStatus(t('lookupFailed'), 'error');
+          itemNameInput.value = decodedText;
+          setTimeout(() => { closeScanner(); itemNameInput.focus(); }, 1800);
+        }
+      }
+
+      /* ===================== Events ===================== */
+      categoryButtons.forEach(btn => {
+        btn.addEventListener('click', (e) => switchCategory(e.currentTarget.dataset.category));
+      });
+
+      saveBtn.addEventListener('click', addNewItem);
+
+      itemNameInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (expiryDateInput.value) addNewItem();
+          else expiryDateInput.focus();
+        }
+      });
+
+      expiryDateInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); addNewItem(); }
+      });
+
+      scanBtn.addEventListener('click', openScanner);
+      closeScannerBtn.addEventListener('click', closeScanner);
+      scannerOverlay.addEventListener('click', (e) => {
+        if (e.target === scannerOverlay) closeScanner();
+      });
+
+      // Language buttons
+      langButtons.forEach(btn => {
+        btn.addEventListener('click', () => applyLanguage(btn.dataset.lang));
+      });
+
+      // Elderly toggle
+      elderlyToggle.addEventListener('click', () => applyElderlyMode(!isElderly));
+
+      /* ===================== Init ===================== */
+      function init() {
+        // Apply elderly + language BEFORE first render
+        applyElderlyMode(isElderly);
+        applyLanguage(currentLang);
+        updateActiveButton();
+
+        if (!localStorage.getItem('expiryTracker_items')) saveItems();
+
+        document.addEventListener('visibilitychange', () => {
+          if (!document.hidden) renderItems();
+        });
+
+        scheduleMidnightRefresh();
+      }
+
+      function scheduleMidnightRefresh() {
+        const now = new Date();
+        const midnight = new Date(now);
+        midnight.setHours(24, 0, 0, 0);
+        const msUntilMidnight = midnight - now;
+
+        setTimeout(() => {
+          renderItems();
+          scheduleMidnightRefresh();
+        }, msUntilMidnight + 1000);
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>
